@@ -59,3 +59,5 @@ OP_DUP OP_HASH160 ffffffffffffffffffffffffffffffffffffffff OP_EQUALVERIFY OP_CHE
 
 Resultado esperado:
 FAIL en OP_EQUALVERIFY
+
+:D
