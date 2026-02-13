@@ -27,7 +27,7 @@ public class Main {
 
             String scriptRaw = Files.readString(path).trim();
 
-            IOpcodeInterpreter interpreter = new BitcoinScriptInterpreter(trace);
+            IOpcodeInterpreter interpreter = new Logica(trace);
 
             System.out.println("Se está evaluando script Bitcoin...\n");
             boolean result = interpreter.execute(scriptRaw);
