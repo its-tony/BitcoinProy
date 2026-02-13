@@ -1,0 +1,63 @@
+PRUEBA P2PKH - BITCOIN SCRIPT
+
+1) scriptPubKey (locking script)
+OP_DUP OP_HASH160 <PubKeyHash160> OP_EQUALVERIFY OP_CHECKSIG
+
+Ejemplo:
+OP_DUP OP_HASH160 1d0f172a0ecb48aee1be1f2687d2963ae33f71a1 OP_EQUALVERIFY OP_CHECKSIG
+
+
+2) scriptSig (unlocking script)
+<FirmaDER+SIGHASH_ALL> <PublicKeyComprimida>
+
+Ejemplo:
+3044022031a2c6f7f7f9f5f7a88c3f7b2d4f6e0f5e1dd2e49b7d6b7a8a1c6f7d5d4c3b12022077c1b22c8f5a98a0a4f4f4d8f040e5e8c5fd3f5a4ed8f0115d4d6a2e3b4c9f5601
+03b0bd634234abbb1ba1e986e884185c8b5f9a6f8f8d5b2c6d6f7b8a9c0d1e2f3
+
+
+3) Script combinado (lo que realmente evalua Bitcoin)
+<FirmaDER+SIGHASH_ALL> <PublicKeyComprimida>
+OP_DUP OP_HASH160 <PubKeyHash160> OP_EQUALVERIFY OP_CHECKSIG
+
+
+4) Trazado de pila (stack) - caso valido
+Inicio:
+[]
+
+Push firma:
+[sig]
+
+Push pubkey:
+[sig, pubkey]
+
+OP_DUP:
+[sig, pubkey, pubkey]
+
+OP_HASH160:
+[sig, pubkey, HASH160(pubkey)]
+
+Push PubKeyHash160 esperado:
+[sig, pubkey, HASH160(pubkey), expectedHash]
+
+OP_EQUALVERIFY:
+Compara HASH160(pubkey) == expectedHash
+Si no son iguales: FAIL
+Si son iguales: continua con [sig, pubkey]
+
+OP_CHECKSIG:
+Verifica que sig firme el txHash con pubkey
+Si es valida: TRUE
+Si no es valida: FAIL
+
+Resultado esperado:
+TRUE
+
+
+5) Caso negativo (debe fallar)
+Usar un PubKeyHash160 diferente en scriptPubKey, por ejemplo:
+OP_DUP OP_HASH160 ffffffffffffffffffffffffffffffffffffffff OP_EQUALVERIFY OP_CHECKSIG
+
+Resultado esperado:
+FAIL en OP_EQUALVERIFY
+
+:D
