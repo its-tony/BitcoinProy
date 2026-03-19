@@ -49,6 +49,14 @@ public class Logica implements IOpcodeInterpreter {
                 stack.push(stack.peek());
             }
 
+            case "OP_DROP" -> {
+                if (stack.size() < 1) {
+                    failed = true;
+                    return;
+                }
+                stack.pop();
+            }
+
             case "OP_HASH160" -> {
                 if (stack.size() < 1) {
                     failed = true;
@@ -56,6 +64,22 @@ public class Logica implements IOpcodeInterpreter {
                 }
                 String value = stack.pop();
                 stack.push("HASH_" + value); 
+            }
+
+            case "OP_EQUAL" -> {
+                if (stack.size() < 2) {
+                    failed = true;
+                    return;
+                }
+
+                String b = stack.pop();
+                String a = stack.pop();
+
+                if (a.equals(b)) {
+                    stack.push("1");
+                } else {
+                    stack.push("0");
+                }
             }
 
             case "OP_EQUALVERIFY" -> {
@@ -89,6 +113,18 @@ public class Logica implements IOpcodeInterpreter {
             }
 
             default -> {
+
+                // OP_0 a OP_16 
+                if (token.startsWith("OP_")) {
+                    try {
+                        int value = Integer.parseInt(token.substring(3));
+                        if (value >= 0 && value <= 16) {
+                            stack.push(String.valueOf(value));
+                            return;
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
+
                 // Es dato (firma, pubkey, hash esperado)
                 stack.push(token);
             }
@@ -101,4 +137,3 @@ public class Logica implements IOpcodeInterpreter {
         failed = false;
     }
 }
-
