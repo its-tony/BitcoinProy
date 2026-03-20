@@ -5,7 +5,7 @@ import java.nio.file.Path;
  * El programa funciona como una implementación de un intérprete de Bitcoin Script basado en una pila.
  * El sistema evalúa scripts de bloqueo y desbloqueo (P2PKH) procesando tokens de izquierda a derecha, utilizando una pila para el almacenamiento de operandos.
  * Utiliza {@link java.util.ArrayDeque} para garantizar operaciones de pila en complejidad O(1).
- * @author Diego Ayala, Antony Portillo, Alejandro Rustrian
+ * @author Diego Ayala, Antony Portillo, Alejandro Rustrian 
  * @version 1.0
  */
 

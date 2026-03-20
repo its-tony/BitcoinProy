@@ -1,8 +1,14 @@
+import java.util.ArrayDeque;
+import java.util.Deque;
 public class Logica implements IOpcodeInterpreter {
 
     private final Stack stack;
     private final boolean trace;
     private boolean failed;
+
+    // condicionales
+    private boolean ejecutando = true;
+    private final Deque<Boolean> ifStack = new ArrayDeque<>();
 
     public Logica(boolean trace) {
         this.stack = new Stack();
@@ -19,10 +25,18 @@ public class Logica implements IOpcodeInterpreter {
 
         for (String token : tokens) {
 
+            // NUEVO (control de ejecución condicional)
+            if (!ejecutando &&
+                !token.equals("OP_IF") &&
+                !token.equals("OP_ELSE") &&
+                !token.equals("OP_ENDIF")) {
+                continue;
+            }
+
             processToken(token);
 
             if (failed) {
-                return false; // fallo inmediato 
+                return false; // fallo inmediato
             }
 
             if (trace) {
@@ -115,6 +129,92 @@ public class Logica implements IOpcodeInterpreter {
                     failed = true;
                 }
             }
+
+            // CONDICIONALES
+            case "OP_IF" -> {
+                if (stack.size() < 1) {
+                    failed = true;
+                    return;
+                }
+
+                String cond = stack.pop();
+                boolean valor = cond.equals("1");
+
+                ifStack.push(valor);
+                ejecutando = valor;
+            }
+
+            case "OP_ELSE" -> {
+                if (ifStack.isEmpty()) {
+                    failed = true;
+                    return;
+                }
+
+                boolean actual = ifStack.pop();
+                boolean invertido = !actual;
+
+                ifStack.push(invertido);
+                ejecutando = invertido;
+            }
+
+            case "OP_ENDIF" -> {
+                if (ifStack.isEmpty()) {
+                    failed = true;
+                    return;
+                }
+
+                ifStack.pop();
+                ejecutando = ifStack.isEmpty() ? true : ifStack.peek();
+            }
+
+            // MULTISIG
+            case "OP_CHECKMULTISIG" -> {
+                if (stack.size() < 1) {
+                    failed = true;
+                    return;
+                }
+
+                int n = Integer.parseInt(stack.pop());
+
+                if (stack.size() < n) {
+                    failed = true;
+                    return;
+                }
+
+                String[] pubkeys = new String[n];
+                for (int i = n - 1; i >= 0; i--) {
+                    pubkeys[i] = stack.pop();
+                }
+
+                int m = Integer.parseInt(stack.pop());
+
+                if (stack.size() < m) {
+                    failed = true;
+                    return;
+                }
+
+                String[] sigs = new String[m];
+                for (int i = m - 1; i >= 0; i--) {
+                    sigs[i] = stack.pop();
+                }
+
+                int valid = 0;
+
+                for (String sig : sigs) {
+                    for (String pub : pubkeys) {
+                        if (verificarFirma(sig, pub)) {
+                            valid++;
+                            break;
+                        }
+                    }
+                }
+
+                if (valid >= m) {
+                    stack.push("1");
+                } else {
+                    failed = true;
+                }
+            }
             
             default -> {
 
@@ -133,11 +233,16 @@ public class Logica implements IOpcodeInterpreter {
                 stack.push(token);
             }
         }
+        
     }
 
     @Override
     public void reset() {
         stack.clear();
         failed = false;
+
+        
+        ejecutando = true;
+        ifStack.clear();
     }
 }
