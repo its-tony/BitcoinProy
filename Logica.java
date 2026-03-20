@@ -36,6 +36,10 @@ public class Logica implements IOpcodeInterpreter {
         return !stack.isEmpty() && stack.pop().equals("1");
     }
 
+    private boolean verificarFirma(String sig, String pubkey) {
+        return sig.equals("SIG_" + pubkey);
+    }
+
     @Override
     public void processToken(String token) {
 
@@ -105,13 +109,13 @@ public class Logica implements IOpcodeInterpreter {
                 String pubkey = stack.pop();
                 String sig = stack.pop();
 
-                if (sig.contains("VALIDA")) {
+                if (verificarFirma(sig, pubkey)) {
                     stack.push("1");
-                } else {
+                    } else {
                     failed = true;
                 }
             }
-
+            
             default -> {
 
                 // OP_0 a OP_16 
