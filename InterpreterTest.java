@@ -72,4 +72,39 @@ public class InterpreterTest {
 
         assertTrue(interpreter.execute(script));
     }
+
+    @Test
+    void scriptVacioDebeRegistrarError() {
+        IOpcodeInterpreter interpreter = new Logica(false);
+
+        assertFalse(interpreter.execute(""));
+        assertEquals("El script está vacío.", interpreter.getLastError());
+    }
+
+    @Test
+    void bloqueCondicionalSinCerrarDebeRegistrarError() {
+        IOpcodeInterpreter interpreter = new Logica(false);
+
+        assertFalse(interpreter.execute("OP_1 OP_IF OP_1"));
+        assertEquals("Bloque condicional sin cerrar: falta OP_ENDIF.", interpreter.getLastError());
+    }
+
+    @Test
+    void opElseSinIfDebeRegistrarError() {
+        IOpcodeInterpreter interpreter = new Logica(false);
+
+        assertFalse(interpreter.execute("OP_ELSE"));
+        assertEquals("Se encontró OP_ELSE sin un OP_IF previo.", interpreter.getLastError());
+    }
+
+    @Test
+    void checkMultisigConCantidadInvalidaDebeRegistrarError() {
+        IOpcodeInterpreter interpreter = new Logica(false);
+
+        assertFalse(interpreter.execute("A OP_CHECKMULTISIG"));
+        assertEquals(
+            "Se esperaba un entero válido en OP_CHECKMULTISIG pero se recibió: A",
+            interpreter.getLastError()
+        );
+    }
 }

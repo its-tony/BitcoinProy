@@ -16,4 +16,10 @@ public interface IOpcodeInterpreter {
      * Se encarga de reiniciar el estado del intérprete (pila, flags, etc).
      */
     void reset();
+
+    /**
+     * Devuelve el último error de ejecución del intérprete.
+     * Si la ejecución no falló por un error interno, retorna null.
+     */
+    String getLastError();
 }

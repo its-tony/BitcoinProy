@@ -5,6 +5,7 @@ public class Logica implements IOpcodeInterpreter {
     private final Stack stack;
     private final boolean trace;
     private boolean failed;
+    private String lastError;
 
     // condicionales
     private boolean ejecutando = true;
@@ -21,37 +22,79 @@ public class Logica implements IOpcodeInterpreter {
 
         reset();
 
-        String[] tokens = script.split("\\s+");
-
-        for (String token : tokens) {
-
-            // NUEVO (control de ejecución condicional)
-            if (!ejecutando &&
-                !token.equals("OP_IF") &&
-                !token.equals("OP_ELSE") &&
-                !token.equals("OP_ENDIF")) {
-                continue;
-            }
-
-            processToken(token);
-
-            if (failed) {
-                return false; // fallo inmediato
-            }
-
-            if (trace) {
-                System.out.println("Token: " + token);
-                System.out.println("Stack: " + stack);
-                System.out.println("------------------");
-            }
+        if (script == null || script.trim().isEmpty()) {
+            lastError = "El script está vacío.";
+            return false;
         }
 
-        // Resultado
-        return !stack.isEmpty() && stack.pop().equals("1");
+        String[] tokens = script.trim().split("\\s+");
+
+        try {
+            for (String token : tokens) {
+
+                if (!ejecutando &&
+                    !token.equals("OP_IF") &&
+                    !token.equals("OP_ELSE") &&
+                    !token.equals("OP_ENDIF")) {
+                    continue;
+                }
+
+                processToken(token);
+
+                if (failed) {
+                    return false;
+                }
+
+                if (trace) {
+                    System.out.println("Token: " + token);
+                    System.out.println("Stack: " + stack);
+                    System.out.println("------------------");
+                }
+            }
+
+            if (!ifStack.isEmpty()) {
+                throw new InterpreterException("Bloque condicional sin cerrar: falta OP_ENDIF.");
+            }
+
+            return !stack.isEmpty() && stack.pop().equals("1");
+        } catch (InterpreterException e) {
+            lastError = e.getMessage();
+
+            if (trace) {
+                System.out.println("Error: " + lastError);
+                System.out.println("------------------");
+            }
+
+            return false;
+        }
     }
 
     private boolean verificarFirma(String sig, String pubkey) {
         return sig.equals("SIG_" + pubkey);
+    }
+
+    private void requireStackSize(int expectedSize, String operation) {
+        if (stack.size() < expectedSize) {
+            throw new InterpreterException(
+                "No hay suficientes elementos en la pila para " + operation + "."
+            );
+        }
+    }
+
+    private int parsePositiveInteger(String value, String operation) {
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed < 0) {
+                throw new InterpreterException(
+                    "Se encontró un entero negativo en " + operation + ": " + value
+                );
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            throw new InterpreterException(
+                "Se esperaba un entero válido en " + operation + " pero se recibió: " + value
+            );
+        }
     }
 
     @Override
@@ -60,35 +103,23 @@ public class Logica implements IOpcodeInterpreter {
         switch (token) {
 
             case "OP_DUP" -> {
-                if (stack.size() < 1) {
-                    failed = true;
-                    return;
-                }
+                requireStackSize(1, "OP_DUP");
                 stack.push(stack.peek());
             }
 
             case "OP_DROP" -> {
-                if (stack.size() < 1) {
-                    failed = true;
-                    return;
-                }
+                requireStackSize(1, "OP_DROP");
                 stack.pop();
             }
 
             case "OP_HASH160" -> {
-                if (stack.size() < 1) {
-                    failed = true;
-                    return;
-                }
+                requireStackSize(1, "OP_HASH160");
                 String value = stack.pop();
                 stack.push("HASH_" + value); 
             }
 
             case "OP_EQUAL" -> {
-                if (stack.size() < 2) {
-                    failed = true;
-                    return;
-                }
+                requireStackSize(2, "OP_EQUAL");
 
                 String b = stack.pop();
                 String a = stack.pop();
@@ -101,10 +132,7 @@ public class Logica implements IOpcodeInterpreter {
             }
 
             case "OP_EQUALVERIFY" -> {
-                if (stack.size() < 2) {
-                    failed = true;
-                    return;
-                }
+                requireStackSize(2, "OP_EQUALVERIFY");
 
                 String b = stack.pop();
                 String a = stack.pop();
@@ -115,10 +143,7 @@ public class Logica implements IOpcodeInterpreter {
             }
 
             case "OP_CHECKSIG" -> {
-                if (stack.size() < 2) {
-                    failed = true;
-                    return;
-                }
+                requireStackSize(2, "OP_CHECKSIG");
 
                 String pubkey = stack.pop();
                 String sig = stack.pop();
@@ -132,10 +157,7 @@ public class Logica implements IOpcodeInterpreter {
 
             // CONDICIONALES
             case "OP_IF" -> {
-                if (stack.size() < 1) {
-                    failed = true;
-                    return;
-                }
+                requireStackSize(1, "OP_IF");
 
                 String cond = stack.pop();
                 boolean valor = cond.equals("1");
@@ -146,8 +168,7 @@ public class Logica implements IOpcodeInterpreter {
 
             case "OP_ELSE" -> {
                 if (ifStack.isEmpty()) {
-                    failed = true;
-                    return;
+                    throw new InterpreterException("Se encontró OP_ELSE sin un OP_IF previo.");
                 }
 
                 boolean actual = ifStack.pop();
@@ -159,8 +180,7 @@ public class Logica implements IOpcodeInterpreter {
 
             case "OP_ENDIF" -> {
                 if (ifStack.isEmpty()) {
-                    failed = true;
-                    return;
+                    throw new InterpreterException("Se encontró OP_ENDIF sin un OP_IF previo.");
                 }
 
                 ifStack.pop();
@@ -169,16 +189,14 @@ public class Logica implements IOpcodeInterpreter {
 
             // MULTISIG
             case "OP_CHECKMULTISIG" -> {
-                if (stack.size() < 1) {
-                    failed = true;
-                    return;
-                }
+                requireStackSize(1, "OP_CHECKMULTISIG");
 
-                int n = Integer.parseInt(stack.pop());
+                int n = parsePositiveInteger(stack.pop(), "OP_CHECKMULTISIG");
 
                 if (stack.size() < n) {
-                    failed = true;
-                    return;
+                    throw new InterpreterException(
+                        "No hay suficientes llaves públicas para OP_CHECKMULTISIG."
+                    );
                 }
 
                 String[] pubkeys = new String[n];
@@ -186,11 +204,19 @@ public class Logica implements IOpcodeInterpreter {
                     pubkeys[i] = stack.pop();
                 }
 
-                int m = Integer.parseInt(stack.pop());
+                requireStackSize(1, "OP_CHECKMULTISIG");
+                int m = parsePositiveInteger(stack.pop(), "OP_CHECKMULTISIG");
+
+                if (m > n) {
+                    throw new InterpreterException(
+                        "La cantidad de firmas requeridas no puede ser mayor que la cantidad de llaves públicas."
+                    );
+                }
 
                 if (stack.size() < m) {
-                    failed = true;
-                    return;
+                    throw new InterpreterException(
+                        "No hay suficientes firmas para OP_CHECKMULTISIG."
+                    );
                 }
 
                 String[] sigs = new String[m];
@@ -240,9 +266,15 @@ public class Logica implements IOpcodeInterpreter {
     public void reset() {
         stack.clear();
         failed = false;
+        lastError = null;
 
         
         ejecutando = true;
         ifStack.clear();
+    }
+
+    @Override
+    public String getLastError() {
+        return lastError;
     }
 }

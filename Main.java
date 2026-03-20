@@ -33,6 +33,9 @@ public class Main {
             boolean result = interpreter.execute(scriptRaw);
 
             System.out.println("\n¿Transacción válida?: " + result);
+            if (!result && interpreter.getLastError() != null) {
+                System.out.println("Error del intérprete: " + interpreter.getLastError());
+            }
 
         } catch (Exception e) {
             System.err.println("Hubo un error al ejecutar el script: " + e.getMessage());
